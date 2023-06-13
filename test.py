@@ -1,11 +1,7 @@
-################################################################################
-### Step 1
-################################################################################
-
 import requests
 import re
 import urllib.request
-from bs4 import BeautifulSoup, NavigableString, Tag
+from bs4 import BeautifulSoup
 from collections import deque
 from html.parser import HTMLParser
 from urllib.parse import urlparse
@@ -22,155 +18,6 @@ HTTP_URL_PATTERN = r'^http[s]{0,1}://.+$'
 # Define root domain to crawl
 domain = "ck3.paradoxwikis.com"
 full_url = "https://ck3.paradoxwikis.com"
-
-def html_to_text_with_images(soup):
-    texts = []
-    img_regex = re.compile(r'/([^/]+)/[^/]+\.\w+$')  # Regex pattern to extract the word in image URL
-    for element in soup.recursiveChildGenerator():
-        if isinstance(element, NavigableString):
-            # Include non-empty strings that don't just contain whitespace
-            if element.strip():
-                texts.append(element.strip())
-        elif isinstance(element, Tag) and element.name == 'img':
-            # If this element is an 'img' tag, add its 'src' attribute to the texts
-            if 'src' in element.attrs:
-                match = img_regex.search(element['src'])
-                if match:
-                    texts.append(match.group(1))  # Only add the specific part of the image URL
-    return '\n'.join(texts)
-
-# Create a class to parse the HTML and get the hyperlinks
-class HyperlinkParser(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        # Create a list to store the hyperlinks
-        self.hyperlinks = []
-
-    # Override the HTMLParser's handle_starttag method to get the hyperlinks
-    def handle_starttag(self, tag, attrs):
-        attrs = dict(attrs)
-
-        # If the tag is an anchor tag and it has an href attribute, add the href attribute to the list of hyperlinks
-        if tag == "a" and "href" in attrs:
-            self.hyperlinks.append(attrs["href"])
-
-################################################################################
-### Step 2
-################################################################################
-
-# Function to get the hyperlinks from a URL
-def get_hyperlinks(url):
-    
-    # Try to open the URL and read the HTML
-    try:
-        # Open the URL and read the HTML
-        with urllib.request.urlopen(url) as response:
-
-            # If the response is not HTML, return an empty list
-            if not response.info().get('Content-Type').startswith("text/html"):
-                return []
-            
-            # Decode the HTML
-            html = response.read().decode('utf-8')
-    except Exception as e:
-        print(e)
-        return []
-
-    # Create the HTML Parser and then Parse the HTML to get hyperlinks
-    parser = HyperlinkParser()
-    parser.feed(html)
-
-    return parser.hyperlinks
-
-################################################################################
-### Step 3
-################################################################################
-
-# Function to get the hyperlinks from a URL that are within the same domain
-def get_domain_hyperlinks(local_domain, url):
-    clean_links = []
-    for link in set(get_hyperlinks(url)):
-        clean_link = None
-
-        # If the link is a URL, check if it is within the same domain
-        if re.search(HTTP_URL_PATTERN, link):
-            # Parse the URL and check if the domain is the same
-            url_obj = urlparse(link)
-            if url_obj.netloc == local_domain:
-                clean_link = link
-
-        # If the link is not a URL, check if it is a relative link
-        else:
-            if link.startswith("/"):
-                link = link[1:]
-            elif (
-                link.startswith("#")
-                or link.startswith("mailto:")
-                or link.startswith("tel:")
-            ):
-                continue
-            clean_link = "https://" + local_domain + "/" + link
-
-        if clean_link is not None:
-            if clean_link.endswith("/"):
-                clean_link = clean_link[:-1]
-            clean_links.append(clean_link)
-
-    # Return the list of hyperlinks that are within the same domain
-    return list(set(clean_links))
-
-
-################################################################################
-### Step 4
-################################################################################
-
-def crawl(url):
-    # Parse the URL and get the domain
-    local_domain = urlparse(url).netloc
-
-    # Get the hyperlinks from the original source page
-    source_page_links = get_domain_hyperlinks(local_domain, url)
-
-    # Create a set to store the URLs that have already been seen (no duplicates)
-    seen = set(source_page_links)
-
-    # Create a directory to store the text files
-    if not os.path.exists("text/"):
-            os.mkdir("text/")
-
-    if not os.path.exists("text/"+local_domain+"/"):
-            os.mkdir("text/" + local_domain + "/")
-
-    # Create a directory to store the csv files
-    if not os.path.exists("processed"):
-            os.mkdir("processed")
-
-    # Process each link found in the source page
-    for link in source_page_links:
-        print(link) # for debugging and to see the progress
-
-        # Save text from the url to a <url>.txt file
-        with open('text/'+local_domain+'/'+link[8:].replace("/", "_") + ".txt", "w", encoding="UTF-8") as f:
-
-            # Get the text from the URL using BeautifulSoup
-            soup = BeautifulSoup(requests.get(link).text, "html.parser")
-
-            # Get the text and image URLs
-            text = html_to_text_with_images(soup)
-
-            # If the crawler gets to a page that requires JavaScript, it will stop the crawl
-            if "You need to enable JavaScript to run this app." in text:
-                print("Unable to parse page " + link + " due to JavaScript being required")
-            else:
-                # Otherwise, write the text (and image sources) to the file in the text directory
-                f.write(text)
-
-crawl(full_url)
-
-
-################################################################################
-### Step 5
-################################################################################
 
 def remove_newlines(serie):
     serie = serie.str.replace('\n', ' ')
@@ -191,7 +38,7 @@ texts=[]
 for file in os.listdir("text/" + domain + "/"):
 
     # Open the file and read the text
-    with open("text/" + domain + "/" + file, "r", encoding="UTF-8") as f:
+    with open("text/" + domain + "/" + file, "r", encoding="utf-8", errors="ignore") as f:
         text = f.read()
 
         # Omit the first 11 lines and the last 4 lines, then replace -, _, and #update with spaces.
@@ -202,7 +49,7 @@ df = pd.DataFrame(texts, columns = ['fname', 'text'])
 
 # Set the text column to be the raw text with the newlines removed
 df['text'] = df.fname + ". " + remove_newlines(df.text)
-df.to_csv('processed/scraped.csv')
+df.to_csv('processed/scraped.csv', escapechar='\\')
 df.head()
 
 ################################################################################
@@ -394,6 +241,7 @@ def answer_question(
 ### Step 13
 ################################################################################
 
-print(answer_question(df, question="What day is it?", debug=False))
+print(answer_question(df, question="How do you establish a Holy Order?", debug=False))
 
-print(answer_question(df, question="What is our newest embeddings model?"))
+print(answer_question(df, question="What is a Holy Order?"))
+

@@ -24,6 +24,8 @@ Once the local server is running:
 4. Select "Develop your own plugin"
 5. Enter in `localhost:5003` since this is the URL the server is running on locally, then select "Find manifest file".
 
+If you run into OpenAPI API key issues, run `export OPENAI_API_KEY=sk.....` in the terminal.
+
 The plugin should now be installed and enabled! You can start with a question like "What is on my todo list" and then try adding something to it as well! 
 
 ## Getting help
